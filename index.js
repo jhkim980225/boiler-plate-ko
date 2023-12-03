@@ -2,47 +2,67 @@ const express = require('express')
 const app = express()
 const port = 5000
 const bodyPaser = require('body-parser');
-const { User } = require('./models/User');
+const {
+    User
+} = require('./models/User');
 const config = require('./config/key')
 const st = require('./config/dev')
+const cookieParser = require('cookie-parser')
+const { auth } = require('./middleware/auth')
 
-app.use(bodyPaser.urlencoded({extended: true}));
+app.use(bodyPaser.urlencoded({
+    extended: true
+}));
 app.use(bodyPaser.json());
+app.use(cookieParser());
+
+// const mongoose = require('mongoose')
+// mongoose
+//     .connect(config.mongoURI)
+//     .then(()=> console.log('MongoDB Connected !!'))
+//     .catch(err => console.log(err))
 
 const mongoose = require('mongoose')
-mongoose
-    .connect(config.mongoURI)
-    .then(()=> console.log('MongoDB Connected !!'))
+mongoose.connect(config.mongoURI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        useCreateIndex: true,
+        useFindAndModify: false
+    }).then(() => console.log('MongoDB Connected...'))
     .catch(err => console.log(err))
 
+
+
 app.get('/', (req, res) => {
-  res.send('Hello Woaxzcdzxfgsdrld!')
+    res.send('Hello Woaxzcdzxfgsdrld!')
+    const user = new User
+    user.hello()
 })
 
-    // 회원 가입 시 필요한 정보를 클라이언트에서 가져오면
-    // 그 데이터를 db에 저장
-    /*
-        "name": "kim",
-        "email": "z@navr.com..."
-    */
-app.post('/register',async (req,res) =>{
+app.post('/api/users/register', async (req, res) => {
     const user = new User(req.body)
-    const result = await user.save().then(()=>{
+    // 저장 성공, 실패 시 동작
+    const result = await user.save().then(() => {
+        console.log(req.body.email + '회원님의 가입이 완료되었습니다.')
         res.status(200).json({
             success: true
         })
-    }).catch((err)=>{
+    }).catch((err) => {
         console.log(err)
-        res.json({success: false})
+        res.json({
+            success: false
+        })
     })
 })
 
-app.post('/login',(req, res)=>{
-
+app.post('/api/users/login', (req, res) => {
+    
     // 전달받은 email이 DB에 있는지 확인
-    User.findOne({email: req.body.email}, (err, user)=>{
+    User.findOne({
+        email: req.body.email
+    }, (err, user) => {
         // 이메일을 찾을 수 없다면 
-        if(!user){
+        if (!user) {
             return res.json({
                 loginSuccess: false,
                 message: "전송한 이메일에 해당하는 유저가 없습니다."
@@ -50,13 +70,24 @@ app.post('/login',(req, res)=>{
         }
 
         // 이메일이 찾아졌으면, 패스워드 검증
+        user.comparePassword(req.body.password, isMatch => {
+            if (!isMatch)
+                return res.json({
+                    loginSuccess: false,
+                    message: "비번 틀림"
+                })
 
-        user.comparePassword(req.body.password, (err, isMatch) =>{
-            if(!isMatch)
-                return res.json({loginSuccess: false, message: "비번 틀림"})
-
+            // 비밀번호가 맞을 시 토큰 생성
             user.generateToken((err, user) => {
-                
+                if (err) return res.status(400).send(err);
+
+                // 토큰 저장 : 쿠키 | 로컬 스토리지
+                console.log(req.body.email + '회원님이 로그인 하였습니다.')
+                res.cookie("x_auth", user.token)
+                    .status(200).json({
+                        loginSuccess: true,
+                        userId: user._id
+                    })
             })
         })
 
@@ -64,6 +95,25 @@ app.post('/login',(req, res)=>{
     })
 })
 
+
+// role 1 : 관리부 role 2 : 영업부 ..
+// role 0 : 일반유저 role 1 : 관리자
+
+app.get('/api/users/auth', auth , (req,res) =>{
+    
+    // auth 미들웨어가 trur 일 시 결과 반환
+    res.status(200).json({
+        _id: req.user._id,
+        isAdmin: req.user.role === 0 ? false : true,
+        isAuth: true,
+        email: req.body.email,
+        name: req.body.name,
+        lastname: req.body.lastname,
+        role: req.user.role,
+        image: req.user.image
+    })
+})
+
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
+    console.log(`Example app listening on port ${port}`)
 })
