@@ -1,16 +1,17 @@
-import React from 'react'
-// {useEffect}
-// import axios from 'axios'
+import React, {useEffect} from 'react'
+
+import axios from 'axios'
 
 function LandingPage() {
 
-  // /api/hello로 접근이 되었을 때 응답을 주겠다.
-  // useEffect(()=>{
-  //   axios.get('/api/hello')
-  //   .then(response=> {console.log(response.data)})
-  // },[])
-
-
+  
+  // LandingPage 접속 시 /api/hello로 axios 요청. 성공 시 data로 담음
+  useEffect(() => {
+    axios.get('/api/hello')
+        .then(response => {
+            console.log(response);  
+        })
+}, []);
 
   return (
     <div>
